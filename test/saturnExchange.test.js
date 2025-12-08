@@ -186,6 +186,48 @@ describe("SaturnExchange", function () {
     expect(await exchange.accumulatedFeesEtc()).to.equal(feeEtc);
   });
 
+  it("supports placeLimitBuyImmediate with refund and STRN delivery", async function () {
+    const { exchange, owner, otherAccount, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
+    const exchangeAddr = await exchange.getAddress();
+
+    // Maker deposits STRN and places a sell
+    await strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+    await exchange.placeLimitSellFromBalance(ONE_ETHER, 1);
+
+    const feeStrn = (LOT_SIZE * 25n) / 10_000n;
+    const netStrn = LOT_SIZE - feeStrn;
+
+    const msgValue = ONE_ETHER * 2n; // send extra to test refund path
+    const buyerTokenBefore = await strn.balanceOf(otherAccount.address);
+
+    const tx = await exchange
+      .connect(otherAccount)
+      .placeLimitBuyImmediate(ONE_ETHER, 1, { value: msgValue });
+    const receipt = await tx.wait();
+    expect(receipt?.status).to.equal(1);
+
+    // Buyer receives STRN externally (net of fee) and refund of unused ETC
+    const buyerTokenAfter = await strn.balanceOf(otherAccount.address);
+    expect(buyerTokenAfter - buyerTokenBefore).to.equal(netStrn);
+
+    const refund = msgValue - ONE_ETHER;
+    expect(refund).to.be.gt(0);
+    // Contract should retain exactly the matched ETC (backing maker internal balance)
+    const contractBalance = await ethers.provider.getBalance(exchangeAddr);
+    expect(contractBalance).to.equal(ONE_ETHER);
+
+    // Maker received ETC internally, lost STRN
+    const makerAcct = await exchange.accounts(owner.address);
+    expect(makerAcct.etherBalance).to.equal(ONE_ETHER);
+    expect(makerAcct.tokenBalance).to.equal(0);
+
+    expect(await exchange.accumulatedFeesStrn()).to.equal(feeStrn);
+
+    const [buyIds, , , sellIds] = await exchange.getOrderBook();
+    expect(buyIds.length).to.equal(0);
+    expect(sellIds.length).to.equal(0);
+  });
+
   it("withdraws all funds and cancels resting orders", async function () {
     const { exchange, owner, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
