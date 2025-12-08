@@ -18,7 +18,7 @@
       </div>
       <div class="actions">
         <input id="exchangeAddress" type="text" placeholder="Exchange address (0x…)" />
-        <input id="strnAddress" type="text" placeholder="STRN address (0x…)" />
+        <input id="saturnAddress" type="text" placeholder="SATURN address (0x…)" />
         <button id="loadDefault">Load demo defaults</button>
         <button id="connect">Connect Wallet</button>
       </div>
@@ -54,12 +54,12 @@
     <section class="grid">
       <div class="card">
         <h3>Deposit</h3>
-        <label>ETC (wei)</label>
+        <label>ETC</label>
         <div class="inline">
-          <input id="depositEtc" type="number" placeholder="1000000000000000000" />
+          <input id="depositEtc" type="number" step="any" placeholder="1.0" />
           <button id="depositEtcBtn">Deposit ETC</button>
         </div>
-        <p class="hint">STRN deposit: send ERC223 transfer to the exchange address.</p>
+        <p class="hint">Enter ETC with decimals (converted to wei automatically). SATURN deposit: send ERC223 transfer to the exchange address.</p>
       </div>
 
       <div class="card">
@@ -69,22 +69,22 @@
             <option value="buy">Buy</option>
             <option value="sell">Sell</option>
           </select>
-          <input id="price" type="number" placeholder="price per lot (wei)" />
-          <input id="lots" type="number" placeholder="lots" />
+          <input id="price" type="number" step="any" placeholder="price per lot (ETC)" />
+          <input id="lots" type="number" step="any" placeholder="SATURN amount" />
           <button id="place">Place</button>
         </div>
-        <p class="hint">1 lot = 1000 STRN (4 decimals). Uses internal balances and leaves remainder resting.</p>
+        <p class="hint">Enter whole SATURN (with decimals); amount must equal whole lots (1 lot = 1000 SATURN).</p>
       </div>
 
       <div class="card">
         <h3>Immediate Buy</h3>
         <div class="inline">
-          <input id="immediatePrice" type="number" placeholder="price per lot (wei)" />
-          <input id="immediateLots" type="number" placeholder="max lots" />
-          <input id="immediateValue" type="number" placeholder="msg.value (wei)" />
+          <input id="immediatePrice" type="number" step="any" placeholder="price per lot (ETC)" />
+          <input id="immediateLots" type="number" step="any" placeholder="SATURN amount" />
+          <input id="immediateValue" type="number" step="any" placeholder="msg.value (ETC)" />
           <button id="buyImmediate">Buy Now</button>
         </div>
-        <p class="hint">Sends ETC with the call; STRN delivered out, unused ETC refunded.</p>
+        <p class="hint">All ETC inputs accept decimals; SATURN amount must be a whole multiple of 1000 (1 lot).</p>
       </div>
 
       <div class="card">

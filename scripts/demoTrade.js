@@ -4,20 +4,20 @@ const { ethers } = require("hardhat");
 // cross it with a buy, and show balances/orderbook before/after.
 async function main() {
   const [deployer, alice, bob] = await ethers.getSigners();
-  const LOT_SIZE = 1000n * 10n ** 4n; // 1000 STRN with 4 decimals
+  const LOT_SIZE = 1000n * 10n ** 4n; // 1000 SATURN with 4 decimals
   const PRICE = ethers.parseEther("1");
 
   console.log("Deploying contracts...");
   const Saturn = await ethers.getContractFactory("Saturn");
-  const strn = await Saturn.deploy();
-  await strn.waitForDeployment();
+  const saturn = await Saturn.deploy();
+  await saturn.waitForDeployment();
 
   const Exchange = await ethers.getContractFactory("SaturnExchange");
-  const exchange = await Exchange.deploy(await strn.getAddress());
+  const exchange = await Exchange.deploy(await saturn.getAddress());
   await exchange.waitForDeployment();
 
   const exchangeAddr = await exchange.getAddress();
-  console.log(`STRN: ${await strn.getAddress()}`);
+  console.log(`SATURN: ${await saturn.getAddress()}`);
   console.log(`Exchange: ${exchangeAddr}`);
 
   const balances = async (label) => {
@@ -28,15 +28,15 @@ async function main() {
     ]);
     console.log(
       `${label} internal balances:\n` +
-        `  deployer STRN=${depAcct.tokenBalance} ETC=${ethers.formatEther(depAcct.etherBalance)}\n` +
-        `  alice    STRN=${aliceAcct.tokenBalance} ETC=${ethers.formatEther(aliceAcct.etherBalance)}\n` +
-        `  bob      STRN=${bobAcct.tokenBalance} ETC=${ethers.formatEther(bobAcct.etherBalance)}`
+        `  deployer SATURN=${depAcct.tokenBalance} ETC=${ethers.formatEther(depAcct.etherBalance)}\n` +
+        `  alice    SATURN=${aliceAcct.tokenBalance} ETC=${ethers.formatEther(aliceAcct.etherBalance)}\n` +
+        `  bob      SATURN=${bobAcct.tokenBalance} ETC=${ethers.formatEther(bobAcct.etherBalance)}`
     );
   };
 
-  // Seller deposits STRN to exchange via ERC223 transfer
-  console.log("Depositing STRN for deployer (seller)...");
-  await strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+  // Seller deposits SATURN to exchange via ERC223 transfer
+  console.log("Depositing SATURN for deployer (seller)...");
+  await saturn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
 
   // Buyer deposits ETC
   console.log("Depositing ETC for bob (buyer)...");
@@ -59,7 +59,7 @@ async function main() {
   console.log("  Buys:", buyIds.length ? buyIds.map((id, i) => ({ id, price: buyPrices[i].toString(), lots: buyLots[i].toString() })) : "empty");
   console.log("  Sells:", sellIds.length ? sellIds.map((id, i) => ({ id, price: sellPrices[i].toString(), lots: sellLots[i].toString() })) : "empty");
 
-  console.log("Accumulated fees STRN:", (await exchange.accumulatedFeesStrn()).toString());
+  console.log("Accumulated fees SATURN:", (await exchange.accumulatedFeesSaturn()).toString());
   console.log("Accumulated fees ETC:", ethers.formatEther(await exchange.accumulatedFeesEtc()));
 }
 

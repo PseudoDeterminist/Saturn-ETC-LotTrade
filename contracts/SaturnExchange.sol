@@ -1,12 +1,12 @@
 // SPDX-License-Identifier: MIT
 pragma solidity ^0.8.20;
 
-/// @notice Minimal ERC223 interface for STRN
+/// @notice Minimal ERC223 interface for SATURN
 interface IERC223 {
     function transfer(address to, uint256 value) external returns (bool);
 }
 
-/// @notice Saturn large-lot STRN/ETC limit-order exchange (v0.1)
+/// @notice Saturn large-lot SATURN/ETC limit-order exchange (v0.1)
 contract SaturnExchange {
     // ------------------------------------------------------------
     // Types and constants
@@ -15,7 +15,7 @@ contract SaturnExchange {
     enum Side { Buy, Sell }
 
     struct Account {
-        uint256 tokenBalance; // STRN internal balance (in smallest units, 4 decimals)
+        uint256 tokenBalance; // SATURN internal balance (in smallest units, 4 decimals)
         uint256 etherBalance; // ETC internal balance (wei)
     }
 
@@ -32,12 +32,12 @@ contract SaturnExchange {
         address user;
         Side    side;
         uint128 pricePerLot; // ETC per lot in wei
-        uint128 lots;        // integer number of lots (1 lot = 1000 STRN)
+        uint128 lots;        // integer number of lots (1 lot = 1000 SATURN)
     }
 
-    // STRN has 4 decimals, 1 lot = 1000 STRN => 1000 * 10^4 units
-    uint256 public constant STRN_DECIMALS = 4;
-    uint256 public constant LOT_SIZE = 1000 * (10 ** STRN_DECIMALS); // 1000 STRN
+    // SATURN has 4 decimals, 1 lot = 1000 SATURN => 1000 * 10^4 units
+    uint256 public constant SATURN_DECIMALS = 4;
+    uint256 public constant LOT_SIZE = 1000 * (10 ** SATURN_DECIMALS); // 1000 SATURN
 
     // Fee: basis points (1e4 = 100%)
     uint16 public constant TAKER_FEE_BPS = 25;  // 0.25%
@@ -46,7 +46,7 @@ contract SaturnExchange {
     // Storage
     // ------------------------------------------------------------
 
-    address public immutable STRN_TOKEN;
+    address public immutable SATURN_TOKEN;
     address public owner;
     bool    public emergencyMode;
 
@@ -69,7 +69,7 @@ contract SaturnExchange {
 
     // Fee accumulation
     uint256 public accumulatedFeesEtc;
-    uint256 public accumulatedFeesStrn;
+    uint256 public accumulatedFeesSaturn;
 
     // Reentrancy guard
     uint256 private constant _NOT_ENTERED = 1;
@@ -80,9 +80,9 @@ contract SaturnExchange {
     // Events
     // ------------------------------------------------------------
 
-    event DepositSTRN(address indexed user, uint256 amount);
+    event DepositSATURN(address indexed user, uint256 amount);
     event DepositETC(address indexed user, uint256 amount);
-    event WithdrawAll(address indexed user, uint256 strnAmount, uint256 etcAmount);
+    event WithdrawAll(address indexed user, uint256 saturnAmount, uint256 etcAmount);
 
     event OrderPlaced(
         uint64 indexed orderId,
@@ -101,9 +101,9 @@ contract SaturnExchange {
         Side   side,          // side of the *maker* (Buy or Sell)
         uint128 pricePerLot,
         uint128 lots,
-        uint256 grossStrn,
+        uint256 grossSaturn,
         uint256 grossEtc,
-        uint256 feeStrn,
+        uint256 feeSaturn,
         uint256 feeEtc
     );
 
@@ -135,9 +135,9 @@ contract SaturnExchange {
     // Constructor
     // ------------------------------------------------------------
 
-    constructor(address _strn) {
-        require(_strn != address(0), "STRN zero");
-        STRN_TOKEN = _strn;
+    constructor(address _saturn) {
+        require(_saturn != address(0), "SATURN zero");
+        SATURN_TOKEN = _saturn;
         owner = msg.sender;
         emit OwnershipTransferred(address(0), msg.sender);
     }
@@ -161,11 +161,11 @@ contract SaturnExchange {
     // Deposits
     // ------------------------------------------------------------
 
-    /// @notice ERC223 tokenFallback – only accept STRN, treat as deposit for v0.1
+    /// @notice ERC223 tokenFallback – only accept SATURN, treat as deposit for v0.1
     function tokenFallback(address from, uint256 value, bytes calldata /*data*/) external {
-        require(msg.sender == STRN_TOKEN, "Only STRN");
+        require(msg.sender == SATURN_TOKEN, "Only SATURN");
         accounts[from].tokenBalance += value;
-        emit DepositSTRN(from, value);
+        emit DepositSATURN(from, value);
     }
 
     /// @notice Deposit ETC into internal balance
@@ -179,7 +179,7 @@ contract SaturnExchange {
     // Views: balances, orders, orderbook
     // ------------------------------------------------------------
 
-    function getUserBalances(address user) external view returns (uint256 strn, uint256 etc) {
+    function getUserBalances(address user) external view returns (uint256 saturn, uint256 etc) {
         Account storage a = accounts[user];
         return (a.tokenBalance, a.etherBalance);
     }
@@ -278,14 +278,14 @@ contract SaturnExchange {
     function _computeUserLocked(address user)
         internal
         view
-        returns (uint256 lockedStrn, uint256 lockedEtc)
+        returns (uint256 lockedSaturn, uint256 lockedEtc)
     {
         uint64 cur = userFirstOrder[user];
         while (cur != 0) {
             Order storage o = orders[cur];
             uint256 lots = uint256(o.lots);
             if (o.side == Side.Sell) {
-                lockedStrn += lots * LOT_SIZE;               // STRN locked
+                lockedSaturn += lots * LOT_SIZE;               // SATURN locked
             } else {
                 lockedEtc  += lots * uint256(o.pricePerLot);  // ETC locked
             }
@@ -476,7 +476,7 @@ contract SaturnExchange {
         _placeLimitInternal(msg.sender, Side.Buy, pricePerLot, lots, true);
     }
 
-    /// @notice Place a limit sell using internal STRN balance; remainder rests as an order.
+    /// @notice Place a limit sell using internal SATURN balance; remainder rests as an order.
     function placeLimitSellFromBalance(
         uint128 pricePerLot,
         uint128 lots
@@ -486,15 +486,15 @@ contract SaturnExchange {
 
         Account storage acct = accounts[msg.sender];
 
-        (uint256 lockedStrn, ) = _computeUserLocked(msg.sender);
-        uint256 strnNeeded = uint256(lots) * LOT_SIZE;
-        require(acct.tokenBalance >= lockedStrn + strnNeeded, "Insufficient STRN");
+        (uint256 lockedSaturn, ) = _computeUserLocked(msg.sender);
+        uint256 saturnNeeded = uint256(lots) * LOT_SIZE;
+        require(acct.tokenBalance >= lockedSaturn + saturnNeeded, "Insufficient SATURN");
 
         _placeLimitInternal(msg.sender, Side.Sell, pricePerLot, lots, true);
     }
 
     /// @notice Place a limit BUY with immediate delivery:
-    /// user sends ETC directly; any matches execute, STRN is sent out, leftover ETC refunded.
+    /// user sends ETC directly; any matches execute, SATURN is sent out, leftover ETC refunded.
     /// No resting order is created.
     function placeLimitBuyImmediate(
         uint128 pricePerLot,
@@ -521,7 +521,7 @@ contract SaturnExchange {
         uint256 tokenAfter = acct.tokenBalance;
 
         // Compute deltas
-        uint256 strnDelta = tokenAfter > tokenBefore ? (tokenAfter - tokenBefore) : 0;
+        uint256 saturnDelta = tokenAfter > tokenBefore ? (tokenAfter - tokenBefore) : 0;
         uint256 etcSpent  = (etherBefore + msg.value) - etherAfter;
 
         // Reset internal balances to pre-call state
@@ -530,9 +530,9 @@ contract SaturnExchange {
 
         // External settlement
 
-        // 1) Send STRN out
-        if (strnDelta > 0) {
-            require(IERC223(STRN_TOKEN).transfer(msg.sender, strnDelta), "STRN transfer failed");
+        // 1) Send SATURN out
+        if (saturnDelta > 0) {
+            require(IERC223(SATURN_TOKEN).transfer(msg.sender, saturnDelta), "SATURN transfer failed");
         }
 
         // 2) Refund unused ETC
@@ -569,34 +569,34 @@ contract SaturnExchange {
                 }
 
                 // Compute gross amounts
-                uint256 grossStrn = uint256(tradeLots) * LOT_SIZE;
-                uint256 grossEtc  = uint256(tradeLots) * uint256(ask.pricePerLot);
+                uint256 grossSaturn = uint256(tradeLots) * LOT_SIZE;
+                uint256 grossEtc    = uint256(tradeLots) * uint256(ask.pricePerLot);
 
                 // Check taker ETC balance
                 Account storage takerAcct = accounts[taker];
                 require(takerAcct.etherBalance >= grossEtc, "Taker ETC insufficient");
 
-                // Apply taker fee in STRN
-                uint256 feeStrn = (grossStrn * TAKER_FEE_BPS) / 10_000;
-                uint256 netStrn = grossStrn - feeStrn;
+                // Apply taker fee in SATURN
+                uint256 feeSaturn = (grossSaturn * TAKER_FEE_BPS) / 10_000;
+                uint256 netSaturn = grossSaturn - feeSaturn;
 
                 // Maker is ask.user
                 address maker = ask.user;
                 Account storage makerAcct = accounts[maker];
 
-                // Maker must have enough STRN
-                require(makerAcct.tokenBalance >= grossStrn, "Maker STRN insufficient");
+                // Maker must have enough SATURN
+                require(makerAcct.tokenBalance >= grossSaturn, "Maker SATURN insufficient");
 
                 // Transfer balances
-                // Maker: gives STRN, receives ETC
-                makerAcct.tokenBalance -= grossStrn;
+                // Maker: gives SATURN, receives ETC
+                makerAcct.tokenBalance -= grossSaturn;
                 makerAcct.etherBalance += grossEtc;
 
-                // Taker: gives ETC, receives STRN (minus fee)
+                // Taker: gives ETC, receives SATURN (minus fee)
                 takerAcct.etherBalance -= grossEtc;
-                takerAcct.tokenBalance += netStrn;
+                takerAcct.tokenBalance += netSaturn;
 
-                accumulatedFeesStrn += feeStrn;
+                accumulatedFeesSaturn += feeSaturn;
 
                 // Emit Trade
                 emit Trade(
@@ -606,9 +606,9 @@ contract SaturnExchange {
                     Side.Sell,
                     ask.pricePerLot,
                     tradeLots,
-                    grossStrn,
+                    grossSaturn,
                     grossEtc,
-                    feeStrn,
+                    feeSaturn,
                     0
                 );
 
@@ -643,11 +643,11 @@ contract SaturnExchange {
                     tradeLots = lotsRemaining;
                 }
 
-                uint256 grossStrn = uint256(tradeLots) * LOT_SIZE;
-                uint256 grossEtc  = uint256(tradeLots) * uint256(bid.pricePerLot);
+                uint256 grossSaturn = uint256(tradeLots) * LOT_SIZE;
+                uint256 grossEtc    = uint256(tradeLots) * uint256(bid.pricePerLot);
 
                 Account storage takerAcct = accounts[taker];
-                require(takerAcct.tokenBalance >= grossStrn, "Taker STRN insufficient");
+                require(takerAcct.tokenBalance >= grossSaturn, "Taker SATURN insufficient");
 
                 uint256 feeEtc = (grossEtc * TAKER_FEE_BPS) / 10_000;
                 uint256 netEtc = grossEtc - feeEtc;
@@ -655,13 +655,13 @@ contract SaturnExchange {
                 address maker = bid.user;
                 Account storage makerAcct = accounts[maker];
 
-                // Maker: gives ETC, receives STRN
+                // Maker: gives ETC, receives SATURN
                 require(makerAcct.etherBalance >= grossEtc, "Maker ETC insufficient");
                 makerAcct.etherBalance -= grossEtc;
-                makerAcct.tokenBalance += grossStrn;
+                makerAcct.tokenBalance += grossSaturn;
 
-                // Taker: gives STRN, receives ETC (net)
-                takerAcct.tokenBalance -= grossStrn;
+                // Taker: gives SATURN, receives ETC (net)
+                takerAcct.tokenBalance -= grossSaturn;
                 takerAcct.etherBalance += netEtc;
 
                 accumulatedFeesEtc += feeEtc;
@@ -673,7 +673,7 @@ contract SaturnExchange {
                     Side.Buy,
                     bid.pricePerLot,
                     tradeLots,
-                    grossStrn,
+                    grossSaturn,
                     grossEtc,
                     0,
                     feeEtc
@@ -755,14 +755,14 @@ contract SaturnExchange {
         cancelAllMyOrders();
 
         Account storage a = accounts[msg.sender];
-        uint256 strn = a.tokenBalance;
+        uint256 saturn = a.tokenBalance;
         uint256 etc  = a.etherBalance;
 
         a.tokenBalance = 0;
         a.etherBalance = 0;
 
-        if (strn > 0) {
-            require(IERC223(STRN_TOKEN).transfer(msg.sender, strn), "STRN transfer failed");
+        if (saturn > 0) {
+            require(IERC223(SATURN_TOKEN).transfer(msg.sender, saturn), "SATURN transfer failed");
         }
 
         if (etc > 0) {
@@ -770,7 +770,7 @@ contract SaturnExchange {
             require(ok, "ETC send failed");
         }
 
-        emit WithdrawAll(msg.sender, strn, etc);
+        emit WithdrawAll(msg.sender, saturn, etc);
     }
 
     // ------------------------------------------------------------
@@ -780,17 +780,17 @@ contract SaturnExchange {
     function withdrawFees(address recipient) external onlyOwner nonReentrant {
         require(recipient != address(0), "Zero recipient");
         uint256 etc = accumulatedFeesEtc;
-        uint256 strn = accumulatedFeesStrn;
+        uint256 saturn = accumulatedFeesSaturn;
 
         accumulatedFeesEtc = 0;
-        accumulatedFeesStrn = 0;
+        accumulatedFeesSaturn = 0;
 
         if (etc > 0) {
             (bool ok, ) = payable(recipient).call{value: etc}("");
             require(ok, "ETC fee send failed");
         }
-        if (strn > 0) {
-            require(IERC223(STRN_TOKEN).transfer(recipient, strn), "STRN fee transfer failed");
+        if (saturn > 0) {
+            require(IERC223(SATURN_TOKEN).transfer(recipient, saturn), "SATURN fee transfer failed");
         }
     }
 

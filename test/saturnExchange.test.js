@@ -6,47 +6,47 @@ describe("SaturnExchange", function () {
   async function deployExchangeFixture() {
     const [owner, otherAccount, third] = await ethers.getSigners();
 
-    // Deploy STRN token (ERC223)
+    // Deploy SATURN token (ERC223)
     const Saturn = await ethers.getContractFactory("Saturn");
-    const strn = await Saturn.deploy();
-    await strn.waitForDeployment();
+    const saturn = await Saturn.deploy();
+    await saturn.waitForDeployment();
 
     const SaturnExchange = await ethers.getContractFactory("SaturnExchange");
-    const exchange = await SaturnExchange.deploy(await strn.getAddress());
+    const exchange = await SaturnExchange.deploy(await saturn.getAddress());
     await exchange.waitForDeployment();
 
     // Constants
-    const LOT_SIZE = 1000n * 10n ** 4n; // 1000 STRN with 4 decimals
+    const LOT_SIZE = 1000n * 10n ** 4n; // 1000 SATURN with 4 decimals
     const ONE_ETHER = ethers.parseEther("1");
 
-    return { exchange, owner, otherAccount, third, strn, LOT_SIZE, ONE_ETHER };
+    return { exchange, owner, otherAccount, third, saturn, LOT_SIZE, ONE_ETHER };
   }
 
-  it("sets STRN token address and owner", async function () {
-    const { exchange, owner, strn } = await loadFixture(deployExchangeFixture);
-    expect(await exchange.STRN_TOKEN()).to.equal(await strn.getAddress());
+  it("sets SATURN token address and owner", async function () {
+    const { exchange, owner, saturn } = await loadFixture(deployExchangeFixture);
+    expect(await exchange.SATURN_TOKEN()).to.equal(await saturn.getAddress());
     expect(await exchange.owner()).to.equal(owner.address);
   });
 
   it("rejects zero address constructor argument", async function () {
     const SaturnExchange = await ethers.getContractFactory("SaturnExchange");
-    await expect(SaturnExchange.deploy(ethers.ZeroAddress)).to.be.revertedWith("STRN zero");
+    await expect(SaturnExchange.deploy(ethers.ZeroAddress)).to.be.revertedWith("SATURN zero");
   });
 
-  it("deposits STRN via ERC223 transfer and rejects non-STRN tokenFallback", async function () {
-    const { exchange, owner, strn, LOT_SIZE } = await loadFixture(deployExchangeFixture);
+  it("deposits SATURN via ERC223 transfer and rejects non-SATURN tokenFallback", async function () {
+    const { exchange, owner, saturn, LOT_SIZE } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
 
     await expect(
-      strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x")
-    ).to.emit(exchange, "DepositSTRN").withArgs(owner.address, LOT_SIZE);
+      saturn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x")
+    ).to.emit(exchange, "DepositSATURN").withArgs(owner.address, LOT_SIZE);
 
     const acct = await exchange.accounts(owner.address);
     expect(acct.tokenBalance).to.equal(LOT_SIZE);
 
     await expect(
       exchange.tokenFallback(owner.address, LOT_SIZE, "0x")
-    ).to.be.revertedWith("Only STRN");
+    ).to.be.revertedWith("Only SATURN");
   });
 
   it("handles ETC deposits", async function () {
@@ -62,11 +62,11 @@ describe("SaturnExchange", function () {
   });
 
   it("places and cancels a resting buy order, updating orderbook and user lists", async function () {
-    const { exchange, otherAccount, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
+    const { exchange, otherAccount, saturn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
 
-    // Seed balances: deposit STRN for future sells and ETC for buys
-    await strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+    // Seed balances: deposit SATURN for future sells and ETC for buys
+    await saturn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
     await exchange.connect(otherAccount).depositEtc({ value: ONE_ETHER });
 
     const price = ONE_ETHER;
@@ -96,19 +96,19 @@ describe("SaturnExchange", function () {
     expect(buyIdsAfter.length).to.equal(0);
   });
 
-  it("matches resting sell against taker buy and collects STRN fee", async function () {
-    const { exchange, owner, otherAccount, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
+  it("matches resting sell against taker buy and collects SATURN fee", async function () {
+    const { exchange, owner, otherAccount, saturn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
 
-    // Seller deposits STRN and places resting ask
-    await strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+    // Seller deposits SATURN and places resting ask
+    await saturn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
     await exchange.placeLimitSellFromBalance(ONE_ETHER, 1);
 
     // Buyer deposits ETC
     await exchange.connect(otherAccount).depositEtc({ value: ONE_ETHER });
 
-    const feeStrn = (LOT_SIZE * 25n) / 10_000n;
-    const netStrn = LOT_SIZE - feeStrn;
+    const feeSaturn = (LOT_SIZE * 25n) / 10_000n;
+    const netSaturn = LOT_SIZE - feeSaturn;
 
     await expect(
       exchange.connect(otherAccount).placeLimitBuyFromBalance(ONE_ETHER, 1)
@@ -122,7 +122,7 @@ describe("SaturnExchange", function () {
         1,
         LOT_SIZE,
         ONE_ETHER,
-        feeStrn,
+        feeSaturn,
         0
       );
 
@@ -134,9 +134,9 @@ describe("SaturnExchange", function () {
     // Taker (buyer)
     const buyerAcct = await exchange.accounts(otherAccount.address);
     expect(buyerAcct.etherBalance).to.equal(0);
-    expect(buyerAcct.tokenBalance).to.equal(netStrn);
+    expect(buyerAcct.tokenBalance).to.equal(netSaturn);
 
-    expect(await exchange.accumulatedFeesStrn()).to.equal(feeStrn);
+    expect(await exchange.accumulatedFeesSaturn()).to.equal(feeSaturn);
 
     const [buyIds, , , sellIds] = await exchange.getOrderBook();
     expect(buyIds.length).to.equal(0);
@@ -144,17 +144,17 @@ describe("SaturnExchange", function () {
   });
 
   it("matches resting buy against taker sell and collects ETC fee", async function () {
-    const { exchange, owner, otherAccount, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
+    const { exchange, owner, otherAccount, saturn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
 
     // Buyer places resting bid
     await exchange.depositEtc({ value: ONE_ETHER });
     await exchange.placeLimitBuyFromBalance(ONE_ETHER, 1);
 
-    // Seller deposits STRN
-    // Move STRN to seller first
-    await strn["transfer(address,uint256,bytes)"](otherAccount.address, LOT_SIZE, "0x");
-    await strn.connect(otherAccount)["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+    // Seller deposits SATURN
+    // Move SATURN to seller first
+    await saturn["transfer(address,uint256,bytes)"](otherAccount.address, LOT_SIZE, "0x");
+    await saturn.connect(otherAccount)["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
 
     const feeEtc = (ONE_ETHER * 25n) / 10_000n;
     const netEtc = ONE_ETHER - feeEtc;
@@ -186,19 +186,19 @@ describe("SaturnExchange", function () {
     expect(await exchange.accumulatedFeesEtc()).to.equal(feeEtc);
   });
 
-  it("supports placeLimitBuyImmediate with refund and STRN delivery", async function () {
-    const { exchange, owner, otherAccount, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
+  it("supports placeLimitBuyImmediate with refund and SATURN delivery", async function () {
+    const { exchange, owner, otherAccount, saturn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
 
-    // Maker deposits STRN and places a sell
-    await strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+    // Maker deposits SATURN and places a sell
+    await saturn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
     await exchange.placeLimitSellFromBalance(ONE_ETHER, 1);
 
-    const feeStrn = (LOT_SIZE * 25n) / 10_000n;
-    const netStrn = LOT_SIZE - feeStrn;
+    const feeSaturn = (LOT_SIZE * 25n) / 10_000n;
+    const netSaturn = LOT_SIZE - feeSaturn;
 
     const msgValue = ONE_ETHER * 2n; // send extra to test refund path
-    const buyerTokenBefore = await strn.balanceOf(otherAccount.address);
+    const buyerTokenBefore = await saturn.balanceOf(otherAccount.address);
 
     const tx = await exchange
       .connect(otherAccount)
@@ -206,9 +206,9 @@ describe("SaturnExchange", function () {
     const receipt = await tx.wait();
     expect(receipt?.status).to.equal(1);
 
-    // Buyer receives STRN externally (net of fee) and refund of unused ETC
-    const buyerTokenAfter = await strn.balanceOf(otherAccount.address);
-    expect(buyerTokenAfter - buyerTokenBefore).to.equal(netStrn);
+    // Buyer receives SATURN externally (net of fee) and refund of unused ETC
+    const buyerTokenAfter = await saturn.balanceOf(otherAccount.address);
+    expect(buyerTokenAfter - buyerTokenBefore).to.equal(netSaturn);
 
     const refund = msgValue - ONE_ETHER;
     expect(refund).to.be.gt(0);
@@ -216,12 +216,12 @@ describe("SaturnExchange", function () {
     const contractBalance = await ethers.provider.getBalance(exchangeAddr);
     expect(contractBalance).to.equal(ONE_ETHER);
 
-    // Maker received ETC internally, lost STRN
+    // Maker received ETC internally, lost SATURN
     const makerAcct = await exchange.accounts(owner.address);
     expect(makerAcct.etherBalance).to.equal(ONE_ETHER);
     expect(makerAcct.tokenBalance).to.equal(0);
 
-    expect(await exchange.accumulatedFeesStrn()).to.equal(feeStrn);
+    expect(await exchange.accumulatedFeesSaturn()).to.equal(feeSaturn);
 
     const [buyIds, , , sellIds] = await exchange.getOrderBook();
     expect(buyIds.length).to.equal(0);
@@ -229,11 +229,11 @@ describe("SaturnExchange", function () {
   });
 
   it("withdraws all funds and cancels resting orders", async function () {
-    const { exchange, owner, strn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
+    const { exchange, owner, saturn, LOT_SIZE, ONE_ETHER } = await loadFixture(deployExchangeFixture);
     const exchangeAddr = await exchange.getAddress();
 
     // Seed balances
-    await strn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
+    await saturn["transfer(address,uint256,bytes)"](exchangeAddr, LOT_SIZE, "0x");
     await exchange.depositEtc({ value: ONE_ETHER });
 
     // Place resting buy (will be cancelled on withdrawAll)
