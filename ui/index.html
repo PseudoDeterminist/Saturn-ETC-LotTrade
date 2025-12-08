@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Saturn Exchange – Local Demo</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div>
+        <h1>Saturn Exchange</h1>
+        <p class="subtitle">Local v0.1 demo (Hardhat 31337)</p>
+      </div>
+      <div class="actions">
+        <input id="exchangeAddress" type="text" placeholder="Exchange address (0x…)" />
+        <input id="strnAddress" type="text" placeholder="STRN address (0x…)" />
+        <button id="loadDefault">Load demo defaults</button>
+        <button id="connect">Connect Wallet</button>
+      </div>
+    </header>
+
+    <section class="grid">
+      <div class="card">
+        <div class="card-header">
+          <h3>Balances</h3>
+          <button id="refresh">Refresh</button>
+        </div>
+        <div id="balances" class="mono small">Not loaded</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Orderbook</h3>
+          <button id="refreshOrderbook">Refresh</button>
+        </div>
+        <div id="orderbook">
+          <div class="book">
+            <h4>Sells</h4>
+            <div id="sellBook" class="table mono small">—</div>
+          </div>
+          <div class="book">
+            <h4>Buys</h4>
+            <div id="buyBook" class="table mono small">—</div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="grid">
+      <div class="card">
+        <h3>Deposit</h3>
+        <label>ETC (wei)</label>
+        <div class="inline">
+          <input id="depositEtc" type="number" placeholder="1000000000000000000" />
+          <button id="depositEtcBtn">Deposit ETC</button>
+        </div>
+        <p class="hint">STRN deposit: send ERC223 transfer to the exchange address.</p>
+      </div>
+
+      <div class="card">
+        <h3>Place Order (from internal balance)</h3>
+        <div class="inline">
+          <select id="side">
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+          </select>
+          <input id="price" type="number" placeholder="price per lot (wei)" />
+          <input id="lots" type="number" placeholder="lots" />
+          <button id="place">Place</button>
+        </div>
+        <p class="hint">1 lot = 1000 STRN (4 decimals). Uses internal balances and leaves remainder resting.</p>
+      </div>
+
+      <div class="card">
+        <h3>Immediate Buy</h3>
+        <div class="inline">
+          <input id="immediatePrice" type="number" placeholder="price per lot (wei)" />
+          <input id="immediateLots" type="number" placeholder="max lots" />
+          <input id="immediateValue" type="number" placeholder="msg.value (wei)" />
+          <button id="buyImmediate">Buy Now</button>
+        </div>
+        <p class="hint">Sends ETC with the call; STRN delivered out, unused ETC refunded.</p>
+      </div>
+
+      <div class="card">
+        <h3>Maintenance</h3>
+        <div class="inline">
+          <input id="cancelId" type="number" placeholder="order id" />
+          <button id="cancel">Cancel order</button>
+          <button id="cancelAll">Cancel all my orders</button>
+        </div>
+        <button id="withdrawAll" class="danger">Withdraw all</button>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/ethers@6.9.0/dist/ethers.umd.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
